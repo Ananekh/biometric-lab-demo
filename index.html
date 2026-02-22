@@ -1,149 +1,61 @@
 <!DOCTYPE html>
-<html lang="fr">
+<html>
 <head>
 <meta charset="UTF-8">
-<title>AI Biometric Lab</title>
-
+<title>Face Test</title>
 <script defer src="https://cdn.jsdelivr.net/npm/face-api.js"></script>
-
-<style>
-body{
-    margin:0;
-    background:#0b0f17;
-    color:#00ffcc;
-    font-family:monospace;
-    text-align:center;
-}
-
-header{
-    background:#121a26;
-    padding:15px;
-    font-size:22px;
-}
-
-video{
-    border:2px solid #00ffcc;
-    border-radius:5px;
-    margin-top:20px;
-}
-
-button{
-    margin:10px;
-    padding:10px 20px;
-    background:#001f2f;
-    color:#00ffcc;
-    border:1px solid #00ffcc;
-    cursor:pointer;
-}
-
-.log{
-    margin:20px auto;
-    width:80%;
-    background:#111;
-    padding:15px;
-    height:150px;
-    overflow-y:scroll;
-    border:1px solid #00ffcc33;
-}
-</style>
 </head>
 
-<body>
+<body style="background:black; color:white; text-align:center;">
 
-<header>
-AI BIOMETRIC ANALYSIS LAB – SECURE HTTPS VERSION
-</header>
+<h2>TEST DETECTION VISAGE</h2>
 
 <video id="video" width="640" height="480" autoplay muted></video>
-
-<div>
-    <button onclick="captureFace()">Capturer</button>
-    <button onclick="compareFaces()">Comparer</button>
-</div>
-
-<div id="status">Initialisation...</div>
-
-<div class="log" id="log"></div>
+<p id="status">Chargement...</p>
 
 <script>
 
-let storedDescriptor = null;
-let currentDescriptor = null;
-
 const video = document.getElementById("video");
 const status = document.getElementById("status");
-const log = document.getElementById("log");
 
-function logEvent(msg){
-    log.innerHTML += "> " + msg + "<br>";
-    log.scrollTop = log.scrollHeight;
-}
+async function start() {
 
-async function loadModels(){
     const MODEL_URL = "https://justadudewhohacks.github.io/face-api.js/models";
-    await faceapi.nets.tinyFaceDetector.loadFromUri(MODEL_URL);
+
+    status.innerText = "Chargement modèles...";
+
+    await faceapi.nets.ssdMobilenetv1.loadFromUri(MODEL_URL);
     await faceapi.nets.faceLandmark68Net.loadFromUri(MODEL_URL);
-    await faceapi.nets.faceRecognitionNet.loadFromUri(MODEL_URL);
-    status.innerText = "Modèles chargés";
-}
 
-async function startCamera(){
-    const stream = await navigator.mediaDevices.getUserMedia({ video: {} });
+    status.innerText = "Modèles OK. Démarrage caméra...";
+
+    const stream = await navigator.mediaDevices.getUserMedia({ video: true });
     video.srcObject = stream;
+
+    video.addEventListener("play", () => {
+
+        setInterval(async () => {
+
+            const detections = await faceapi.detectAllFaces(
+                video,
+                new faceapi.SsdMobilenetv1Options()
+            );
+
+            if(detections.length > 0){
+                status.innerText = "VISAGE DETECTÉ";
+                status.style.color = "lime";
+            } else {
+                status.innerText = "Aucun visage";
+                status.style.color = "red";
+            }
+
+        }, 500);
+
+    });
+
 }
 
-video.addEventListener("play", () => {
-    setInterval(async () => {
-
-        const detections = await faceapi
-            .detectAllFaces(video, new faceapi.TinyFaceDetectorOptions())
-            .withFaceLandmarks()
-            .withFaceDescriptors();
-
-        if(detections.length > 0){
-            currentDescriptor = detections[0].descriptor;
-            status.innerText = "Visage détecté";
-        } else {
-            currentDescriptor = null;
-            status.innerText = "Aucun visage";
-        }
-
-    }, 400);
-});
-
-function captureFace(){
-    if(currentDescriptor){
-        storedDescriptor = currentDescriptor;
-        logEvent("Profil capturé");
-    } else {
-        logEvent("Aucun visage détecté");
-    }
-}
-
-function compareFaces(){
-    if(storedDescriptor && currentDescriptor){
-        const distance = faceapi.euclideanDistance(storedDescriptor, currentDescriptor);
-        const similarity = (1 - distance).toFixed(3);
-
-        logEvent("Distance: " + distance.toFixed(4));
-        logEvent("Similarité: " + similarity);
-
-        if(distance < 0.45){
-            logEvent("Correspondance probable");
-        } else {
-            logEvent("Non correspondant");
-        }
-    } else {
-        logEvent("Données insuffisantes");
-    }
-}
-
-async function init(){
-    await loadModels();
-    await startCamera();
-}
-
-init();
+start();
 
 </script>
 
